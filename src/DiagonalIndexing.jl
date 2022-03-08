@@ -1,5 +1,5 @@
 """
-Support diagonal indexing of abstract arrays.
+Provides a convenient way of selecting diagonal elements of arrays.
 """
 module DiagonalIndexing
 export diagonal

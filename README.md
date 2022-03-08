@@ -1,2 +1,2 @@
 # DiagonalIndexing.jl
-Easily get or set the diagonal elements of an array.
+Provides a convenient way of selecting diagonal elements of arrays.
