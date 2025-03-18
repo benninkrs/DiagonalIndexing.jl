@@ -2,12 +2,12 @@
 Provides a convenient way of selecting diagonal elements of arrays.
 """
 module DiagonalIndexing
-export Diagnl, diagnl, DiagCartesianIndices
+export diagonal, DiagIndex, DiagCartesianIndices
 
 # TODO
-# Consider naming. Currently we have diagnl (constant instance) and constructors for Diagnl{N}
+# Consider naming. Currently we have diagonal (constant instance) and constructors for DiagIndex{N}
 # The use of both lower- and upper- case is aesthetically not bad, but maybe not ideal.
-# We could instead define "diagnl" or ("diagonal") as a _function_.
+# We could instead define "diagonal" or "diagl" or "diagonal") as a _function_.
 # When used without parantheses, we can dispatch (probably) on typeof(diagonal).
 # When used with parentheses, it returns an instance of DiagIndex{N}.
 # We could still have the constructor DiagIndex{N}(), but I'm guessing diagonal(0,0,0,0) will be preferable anyway.
@@ -66,18 +66,39 @@ end
 
 
 """
-	Diagnl{N}
+	DiagIndex{N}
 
 Type representing a diagonal along consecutive dimensions of an array.
-Instances of `Diagnl` are intended to be used as indices in indexing expressions.
+Instances of `DiagIndex` are intended to be used as indices in indexing expressions.
 
-`Diagnl{N}()` represents the main diagonal on `N` consecutive dimensions.
+`DiagIndex{N}()` represents the main diagonal on `N` consecutive dimensions.
 
-`Diagnl{Any}()` represents the main diagonal on remaining unindexed dimensions of an array.
-
-`Diagnl(o_1,...,o_N)` represents the diagonal `(begin+o_1, ..., begin+o_N):(1,...,1):(end,...,end)` 
+`DiagIndex(o_1,...,o_N)` represents the diagonal `(begin+o_1, ..., begin+o_N):(1,...,1):(end,...,end)` 
 on `N` consecutive dimensions.
 
+See ['diagonal'](@ref).
+"""
+struct DiagIndex{N}
+	offsets::Tuple{Vararg{Int,N}}
+	function DiagIndex(offsets::Vararg{Int,N}) where {N}
+		all(o -> o>=0, offsets) || error("Diagonal offsets must all be ≥ 0.  Got $offsets")
+		new{N}(offsets)
+	end
+	function DiagIndex{N}() where {N}
+		new{N}(ntuple(i->0, Val(N)))
+	end
+end
+
+
+
+"""
+	diagonal
+
+When used as an index, `diagonal` selects the meain diaognal or all remaining
+dimensions of an array.
+
+`diagonal(o_1,...,o_N)` creates an index the selects a diagonal with offsets o_1,...,o_N
+on N consecutive axes.
 
 # Examples
 
@@ -104,19 +125,19 @@ julia> A = [i+10j+100k for i=1:4, j=1:3, k=1:3];
  313  323  333
  314  324  334
 
-julia> A[diagnl]
+julia> A[diagonal]
 3-element Vector{Int64}:
  111
  222
  333
 
-julia> A[3,diagnl]
+julia> A[3,diagonal]
 3-element Vector{Int64}:
  113
  223
  333
 
-julia> A[Diagnl(1,0),2] = [-8, -9, -10]; A
+julia> A[DiagIndex(1,0),2] = [-8, -9, -10]; A
 4×3×3 Array{Int64, 3}:
 [:, :, 1] =
  111  121  131
@@ -136,132 +157,102 @@ julia> A[Diagnl(1,0),2] = [-8, -9, -10]; A
  313  323  333
  314  324  334
 ```
-"""
-struct Diagnl{N,M}
-	offsets::Tuple{Vararg{Int,M}}
-	function Diagnl(offsets::Vararg{Int,N}) where {N}
-		all(o -> o>=0, offsets) || error("Diagonal offsets must all be ≥ 0.  Got $offsets")
-		new{N,N}(offsets)
-	end
-	function Diagnl{N}() where {N}
-		new{N,N}(ntuple(i->0, Val(N)))
-	end
-	function Diagnl{Any}()
-		new{Any,0}(())
-	end
-end
-
-
 
 """
-	const diagnl = Diagnl{Any}()
-
-Constant that, when used as an index, selects diagonal elements along all remaining
-dimensions of an array.  See [`Diagnl`](@ref)
-"""
-const diagnl = Diagnl{Any}()
+diagonal(offsets...) = DiagIndex(offsets...)
 
 
 # Implement the indexing behavior
 
 
-# Specaial case: Diagnl is the only index.
+# Specaial case: DiagIndex is the only index.
 # In this case we can dispatch to fast linear indexing when supported.
 
-to_indices(A::AbstractArray, I::Tuple{Diagnl}) = _to_indices_style(IndexStyle(A), A, I[1])
+@inline to_indices(A::AbstractArray, ::Tuple{typeof(diagonal)}) = _to_indices_style(IndexStyle(A), A, DiagIndex{ndims(A)}())
+@inline to_indices(A::AbstractArray, I::Tuple{DiagIndex}) = _to_indices_style(IndexStyle(A), A, I[1])
 
-_to_indices_style(::IndexLinear, A, I) = _to_indices_linear(A, I)		# specialized linear method
-_to_indices_style(::IndexCartesian, A, I) = to_indices(A, axes(A), (I,))  # fallback to general methods below
-
-
-
-_to_indices_linear(A::AbstractArray, dind::Diagnl{Any})  = _to_indices_linear(A, Diagnl{ndims(A)}())
+@inline _to_indices_style(::IndexLinear, A, I) = _to_indices_linear(A, I)		# specialized linear method
+@inline _to_indices_style(::IndexCartesian, A, I) = to_indices(A, axes(A), (I,))  # fallback to general methods below
 
 
-function _to_indices_linear(A::AbstractArray, dind::Diagnl{M}) where {M}
-	# println("Checkpoint: _to_indices_linear")
-	N = ndims(A)
-	M >= N || error("Diagnl has more dimensions ($M) than the targeted array does ($N).")
 
-	s = size(A)
+@inline function _to_indices_linear(A::AbstractArray, dind::DiagIndex{N}) where {N}
+	NA = ndims(A)
+	N < NA && error("DiagIndex has fewer dimensions ($N) than the targeted array does ($NA).")
 
-	# step = 1
-	# stride = 1
-	# offset = dind.offsets[1]
-	# # TODO:  Make this an inferred loop
-	# for i = 2:M
-	# 	stride *= s[i-1]
-	# 	step += stride
-	# 	offset += dind.offsets[i]*stride
-	# end
+	sz = size(A)
 
+	# Are these loops inferred?  If not, could we make them so?
 	step = 0
 	offset = 0
 	stride = 1
-	k = maximum(s)
-	# TODO:  Make this an inferred loop?
-	for i = 1:N
+	len = maximum(sz)
+	for i = 1:NA
 		step += stride
 		o = dind.offsets[i]
-		k = min(k, s[i]-o)
+		len = min(len, sz[i]-o)
 		offset += o*stride
-		stride *= s[i]
+		stride *= sz[i]
 	end
-	N<M && (step += stride)
-	# (firstindex(A)+offset:step:lastindex(A),)		# this is wrong when the array is not square
+	# If N>NA, the extra axes are treated as having size 1.
+	# If the extra offsets are all 0, the diagional has a single element; otherwise the diagonal is empty.
+	# This is automatically achieved by computing appropriate values of offset, step, and len.
+	for i = NA+1:N
+		step += stride
+		o = dind.offsets[i]
+		len = min(len, 1-o)
+		offset += o*stride
+	end
+
 	start = firstindex(A) + offset
-	stop = start + (k-1)*step 
+	stop = start + (len-1)*step
 	(start:step:stop,)
 end
 
 
-# function _to_indices_linear(A::AbstractMatrix, dind::Diagnl{M}) where {M}
-# 	M == 2 || error("When used as the only index, diagonal must have the same number dimensions as the targeted array")
-# 	(m, n) = size(A)
-# 	offset = dind.offset[1] + dind.offset[2]*m
+# We used to specialize for 2-dimensional array; but it doesn't seem to yield any benefit.
+# @inline function _to_indices_linear(A::AbstractMatrix, dind::DiagIndex{N}) where {N}
+# 	N == 2 || error("When used as the only index, diagonal must have the same number dimensions as the targeted array")
+# 	m = size(A,1)
+# 	offset = dind.offsets[1] + dind.offsets[2]*m
 # 	(firstindex(A)+offset:(m+1):lastindex(A),)
 # end
 
 
 
-
-# General case: Diagnl is not the only index.
+# General case: DiagIndex is not the only index.
 # These functions take axes as an argument and will be called by Base.to_indices(::AbstractArray, I)
 
-# TODO: Handle linear indexing when DiagonalIndexing is not the only index?
+# TODO: Would it be feasible and beneficial to do linear indexing when DiagonalIndexing is not the only index?  
 
 
-# When Diagnl{Any} is the last index, take the main diagonal on all remaining axes.
-function to_indices(::AbstractArray, ax, ::Tuple{Diagnl{Any}})
+# When diagonal is the last index, take the main diagonal on all remaining axes.
+function to_indices(::AbstractArray, ax, ::Tuple{typeof(diagonal)})
 	(DiagCartesianIndices(ax),)
 end 
 
 
-# Diagnl{Any} must be used in the last position.
-function to_indices(::AbstractArray, ax, ::Tuple{Diagnl{Any}, Vararg{Any}})
-	error("Diagnl{Any} may only be used as the last index.")
+# diagonal must be used in the last position.
+function to_indices(::AbstractArray, ax, ::Tuple{typeof(diagonal), Vararg{Any}})
+	error("'diagonal' without arguments may only be used as the last index.")
 end 
 
 
-# For Diagb{N}, return the indices for the diagonal specified by the offsets 
-function to_indices(A::AbstractArray, ax, I::Tuple{Diagnl{M}, Vararg{Any}}) where {M}
-	# println("Checkpoint: to_indices (general)")
+# For DiagIndex{N}, return the indices for the diagonal specified by the offsets 
+function to_indices(A::AbstractArray, ax, I::Tuple{DiagIndex{N}, Vararg{Any}}) where {N}
+	# TODO: Handle the case that ax[i] is empty
+	# TODO: Handle the case that o[i] !=0 for i>N (should return an empty array)
 	o = I[1].offsets
-	N = length(ax)
-	if N >= M
-		# Select the diagonal on the first M of N axes
-		ax_off = ntuple(i -> (ax[i][1] + o[i]):ax[i][end], Val(M))
+	NA = length(ax)
+	if NA >= N
+		# Select the diagonal on the first N of NA axes
+		ax_off = ntuple(i -> (ax[i][1] + o[i]):ax[i][end], Val(N))
 		inds = DiagCartesianIndices(ax_off)
 	else
-		# When M > N, select just the first element along the N axes
-		# TODO: Handle the case that ax[i] is empty
-		# TODO: Handle the case that o[i] !=0 for i>M (should return an empty array)
-		inds = ntuple(i -> ax[i][1] + o[i], Val(M))
+		# When N > NA, select just the first element along the NA axes
+		inds = ntuple(i -> ax[i][1] + o[i], Val(N))
 	end
-	# println(typeof(inds))
-	# println((inds, to_indices(A, ax[M+1:end], I[2:end])...))
-	return (inds, to_indices(A, ax[M+1:end], I[2:end])...)
-	# return (inds,)
+	return (inds, to_indices(A, ax[N+1:end], I[2:end])...)
 end
 
 
