@@ -1,56 +1,90 @@
-# DiagonalIndexing.jl
-**DiagonalIndexing** provides a convenient, intuitive way of reading and assigning array diagonals.
+# DiagonalIndexing.jl 
+**DiagonalIndexing** provides a convenient, flexible way of selecting array diagonals in indexing expressions.
 
-## Motivation
-Julia's built-in `diag` function is a convenient way to read the diagonal elements of a matrix, but it cannot be used to assign to the diagonal of a matrix:
-```
-A = rand(4,4)
-diag(A) = [1, 2, 3, 4]		# error
-```
-Also, `diag` cannot be used on arrays of dimension greater than 2.
+## Introduction
+Julia's built-in support for diagonal indexing is rather limited.  The `diag` function allows one to extract the diagonal of a matrix, but cannot be used to assign to the diagonal.  The `diagind` function returns the indices of the diagonal elements, which are usually not themsleves of interest.  Furthermore, built-in support for diagonal indexing is limited to matrices (2-dimensional arrays).
+
+This package provides a more convenient and flexible approach to diagonal indexing.  In brief, the constant `diagnl` may be used in the index list to select the main diagonal of any array. Similarly, `Diagnl(o_1,...,o_N)` may be used in the place of N indices to select a diagonal offset by (o_1,...,o_N) elements along N consecutive axes. Such a "diagonal index" may occur anywhere in an index list and in combination with other indices.  Indexing diagonals in this way is essentially as fast as indexing with ranges or explicit lists of indices.
+
 
 ## Usage
-This package exports a constant, `diagonal`, which can be used in any indexing expressing to refer to the diagonal elements of an array, much as `begin` and `end` refer to the first and last elements of an array:
 
+Use the exported constant `diagnl` as an index to select the main diagonal of an array:
 ```
-julia> using DiagonalIndexing
-
-julia> A = [1 2 3; 4 5 6; 7 8 9; 10 11 12]
+julia>  A = [1 2 3; 4 5 6; 7 8 9; 10 11 12]
 4×3 Matrix{Int64}:
   1   2   3
   4   5   6
   7   8   9
  10  11  12
 
-julia> A[diagonal]
+julia> A[diagnl]
 3-element Vector{Int64}:
  1
  5
  9
 
-julia> A[diagonal] = [-10, -50, -90];
-
-julia> A
-4×3 Matrix{Int64}:
- -10    2    3
-   4  -50    6
-   7    8  -90
-  10   11   12
+ julia> A[diagnl] = [-1, -5, -9]; A
+ 4×3 Matrix{Int64}:
+ -1   2   3
+  4  -5   6
+  7   8  -9
+ 10  11  12
 ```
+`diagnl` can also be used as the last of multiple indices to select the main diagonal on the remaining axes.
 
-`diagonal` is performant and can be used with any type of `AbstractArray` that supports either linear or Cartesian indexing, including multidimensional arrays and arrays with custom axes.  For multidimensional arrays, `A[diagonal]` refers to the vector `[A[1,1,..], A[2,2,..], .., A[k,k,..]]` where `k = minimum(size(A))`.
+More generally, `Diagnl(o1,...,oN)` represents a diagonal on `N` consecutive axes, starting with element `[begin+o1, ..., begin+oN]`:
+```
+julia> A[Diagnl(0,1)]      
+2-element Vector{Int64}:
+ 2
+ 6
+```
+ `Diagnl(0,...,0)` represents the main diagonal, and can be obtained by the alternative (in some cases, shorter) constructor `Diagnl{N}()`.
+ 
+ Unlike `diagnl`, instances of `Diagnl` with specific dimensionality can be used at any position in an indexing expression:
+```
+juila> B = [i+10j+100k for i=1:4, j=1:3, k=1:3]
+4×3×3 Array{Int64, 3}:
+[:, :, 1] =
+ 111  121  131
+ 112  122  132
+ 113  123  133
+ 114  124  134
 
-The two main usage restrictions are:
-* `diagonal` cannot be used in conjunction with any other indices (as one might expect).
-* Broadcasting with `diagonal` is not currently supported.
+ ⋮
+
+[:, :, 3] =
+ 311  321  331
+ 312  322  332
+ 313  323  333
+ 314  324  334
+
+juila> B[Diagnl(0,0), 3]   
+3-element Vector{Int64}:
+ 311
+ 322
+ 333
+``` 
+
+
+## Usage Details
+
+* When applied to a set of axes, `Diagnl(o1,o2,...)` nominally maps to `[CartesianIndex(first[1]+o1, first[2]]+o2,...), ..., CartesianIndex(first[1]+o1+k, first[2]+o2+k, ...)]` where `first[j]` denotes the first index of the `j`th axis and `k` is the largest value such that the all the indices are in the range of their corresponding axes.
+
+* Whereas the diagonal of an $n\times 1$ matrix is just the first element, the "diagonal" of a vector (1-dimensional array) is the vector itself.
+
+* `diagnl` is an alias for `Diagnl{Any}()`.
 
 ## Implementation Details
-Whenever an indexing expression is encountered, the built-in function `to_indices` is called to convert the index (whatever type it is) into a collection of natively-supported indices. `DiagonalIndexing` first defines a singleton type `DiagonalIndex`, whose sole instance is `diagonal`. It then extends `to_indices` with methods to convert `diagonal` to an explicit collection of indices corresponding to the diagonal elements of the input array.
 
-For an array `A` whose index style is `IndexLinear`, `diagonal` is converted to `1:stride:length(A)` for an appropriate value of `stride`.
+`DiagonalIndexing` exploits the fact that Julia allows any type of value to be used an index, so long as methods are provided to translate that value into a range or collections of integers.
+This package extends the Base function `to_indices` to translate instances of `Diagnl` to appropriate ranges of indices of the targeted array.
 
-If the index style is `IndexCartesian`, a bit more work is needed.  In principle the `diagonal` could be converted to an array of `CartesianIndex`es, e.g. 
+In the general case, a `Diagnl` index is translated to a vector of `CartesianIndex` values, e.g. 
 ```
 [CartesianIndex((1,1,...)), CartesianIndex((2,2,...)), ...]
 ```
-but instantiating such an array is inefficient. To avoid this, a special lazy array type is defined that produces the individual `CartesianIndex` elements on-the-fly as the destination vector is populated.
+However, this array is not explicitly constructed.  Instead, a custom virtual array type is used to produce the `CartesianIndex` values on demand.
+
+If the index style of the array is `IndexLinear` and the `Diagnl` index is the only index, it is translated to a range `firstindex(A)+offset:step:lastindex(A)` for suitable values of `offset` and `step`.
