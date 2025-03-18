@@ -1,7 +1,7 @@
 name = "DiagonalIndexing"
 uuid = "d2677e01-3654-4f8a-9d1f-7a356cb83656"
 authors = ["Ryan Bennink <benninkrs@ornl.gov>"]
-version = "0.1.0"
+version = "0.7.0"
 
 [deps]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
