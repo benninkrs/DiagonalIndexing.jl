@@ -4,23 +4,15 @@ Provides a convenient way of selecting diagonal elements of arrays.
 module DiagonalIndexing
 export diagonal, DiagIndex, DiagCartesianIndices
 
-# TODO
-# Consider naming. Currently we have diagonal (constant instance) and constructors for DiagIndex{N}
-# The use of both lower- and upper- case is aesthetically not bad, but maybe not ideal.
-# We could instead define "diagonal" or "diagl" or "diagonal") as a _function_.
-# When used without parantheses, we can dispatch (probably) on typeof(diagonal).
-# When used with parentheses, it returns an instance of DiagIndex{N}.
-# We could still have the constructor DiagIndex{N}(), but I'm guessing diagonal(0,0,0,0) will be preferable anyway.
-
 
 import Base: getindex, IndexStyle, checkbounds, checkbounds_indices, to_indices, index_ndims, size, length
 
 
 # First, a helper type.
 #
-# In general, to_indices must return a collection of CartesionIndex's.
-# But instantiating such a vector is slow.  We cannot use a generator, because
-# the collection must be <: AbstractArray.
+# In general, we need to_indices to return a collection of CartesionIndex's.
+# But instantiating such a vector is slow.  And we cannot use a generator, because
+# the returned collection must be <: AbstractArray.
 # Thus, we define a type of lazy array of CartesianIndex's.
 
 """
@@ -240,17 +232,15 @@ end
 
 # For DiagIndex{N}, return the indices for the diagonal specified by the offsets 
 function to_indices(A::AbstractArray, ax, I::Tuple{DiagIndex{N}, Vararg{Any}}) where {N}
-	# TODO: Handle the case that ax[i] is empty
-	# TODO: Handle the case that o[i] !=0 for i>N (should return an empty array)
 	o = I[1].offsets
 	NA = length(ax)
 	if NA >= N
 		# Select the diagonal on the first N of NA axes
-		ax_off = ntuple(i -> (ax[i][1] + o[i]):ax[i][end], Val(N))
+		ax_off = ntuple(i -> (firstindex(ax[i]) + o[i]):ax[i][end], Val(N))
 		inds = DiagCartesianIndices(ax_off)
 	else
 		# When N > NA, select just the first element along the NA axes
-		inds = ntuple(i -> ax[i][1] + o[i], Val(N))
+		inds = ntuple(i -> firstindex(ax[i]) + o[i], Val(N))
 	end
 	return (inds, to_indices(A, ax[N+1:end], I[2:end])...)
 end
