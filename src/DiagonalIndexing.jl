@@ -172,13 +172,15 @@ diagonal(offsets...) = DiagIndex(offsets...)
 	NA = ndims(A)
 	N < NA && error("DiagIndex has fewer dimensions ($N) than the targeted array does ($NA).")
 
-	sz = size(A)
 
-	# Are these loops inferred?  If not, could we make them so?
+	# Calculate the start, step, and stop of the associated range of linear indices
+	# (This does not seem to significantly add to the run time)
+	sz = size(A)
 	step = 0
 	offset = 0
 	stride = 1
 	len = maximum(sz)
+
 	for i = 1:NA
 		step += stride
 		o = dind.offsets[i]
@@ -186,6 +188,7 @@ diagonal(offsets...) = DiagIndex(offsets...)
 		offset += o*stride
 		stride *= sz[i]
 	end
+
 	# If N>NA, the extra axes are treated as having size 1.
 	# If the extra offsets are all 0, the diagional has a single element; otherwise the diagonal is empty.
 	# This is automatically achieved by computing appropriate values of offset, step, and len.
@@ -236,11 +239,11 @@ function to_indices(A::AbstractArray, ax, I::Tuple{DiagIndex{N}, Vararg{Any}}) w
 	NA = length(ax)
 	if NA >= N
 		# Select the diagonal on the first N of NA axes
-		ax_off = ntuple(i -> (firstindex(ax[i]) + o[i]):ax[i][end], Val(N))
+		ax_off = ntuple(i -> (first(ax[i]) + o[i]):ax[i][end], Val(N))
 		inds = DiagCartesianIndices(ax_off)
 	else
 		# When N > NA, select just the first element along the NA axes
-		inds = ntuple(i -> firstindex(ax[i]) + o[i], Val(N))
+		inds = ntuple(i -> first(ax[i]) + o[i], Val(N))
 	end
 	return (inds, to_indices(A, ax[N+1:end], I[2:end])...)
 end
