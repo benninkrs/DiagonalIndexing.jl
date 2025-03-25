@@ -2,9 +2,9 @@
 **DiagonalIndexing** provides a convenient, flexible way of selecting array diagonals in indexing expressions.
 
 ## Introduction
-Julia's built-in support for diagonal indexing is rather limited.  The `diag` function allows one to extract the diagonal of a matrix, but cannot be used to assign to the diagonal.  The `diagind` function returns the indices of the diagonal elements, which are usually not themsleves of interest.  Furthermore, built-in support for diagonal indexing is limited to matrices (2-dimensional arrays).
+Julia's built-in support for diagonal indexing is rather limited.  The `diag` function allows one to extract the diagonal of a matrix, but cannot be used to assign to the diagonal.  The `diagind` function returns the indices of the diagonal elements, which are usually not themselves of interest.  Furthermore, built-in support for diagonal indexing is limited to matrices (2-dimensional arrays).
 
-This package provides a more convenient and flexible approach to diagonal indexing.  In brief, `diagonal` may be used as an index to select the main diagonal of any `AbstractArray` (even with custom axes). More generally, `diagonal(o_1,...,o_N)` may be used in the place of N index slots to select a diagonal offset by (o_1,...,o_N) elements on N consecutive axes. Such a "diagonal index" may occur anywhere in an index list and in combination with other indices.  Indexing diagonals in this way is nearly as fast as indexing with ranges or explicit lists of indices.
+This package provides a more convenient and flexible approach to diagonal indexing.  In brief, `diagonal` may be used as an index to select the main diagonal of any `AbstractArray` (even with custom axes). More generally, `diagonal(o_1,...,o_N)` may be used in the place of N index slots to select a diagonal offset by `(o_1,...,o_N)` elements on `N` consecutive axes. Such a "diagonal index" may occur anywhere in an index list and in combination with other indices.  Indexing diagonals in this way is nearly as fast as indexing with ranges or explicit lists of indices.
 
 
 ## Usage
@@ -72,11 +72,11 @@ juila> B[4,diagonal(1,0)]
 
 ## Usage Details
 
-When used as in index, `diagonal(o1,o2,...)` is effectively mapped to `[CartesianIndex(begin[1]+o1, begin[2]+o2,...), ..., CartesianIndex(begin[1]+o1+k, begin[2]+o2+k, ...)]` where `first[j]` denotes the first index of the `j`th axis and `k` is the largest value such that the all the indices are in the range of their corresponding axes.  From this definition it follows that:
+When used as an index, `diagonal(o1,o2,...)` is effectively mapped to `[CartesianIndex(begin[1]+o1, begin[2]+o2,...), ..., CartesianIndex(begin[1]+o1+k, begin[2]+o2+k, ...)]` where `first[j]` denotes the first index of the `j`th axis and `k` is the largest value such that the all the indices are in the range of their corresponding axes.  From this definition it follows that:
 
 * The "diagonal" of a vector (1-dimensional array) is the vector itself.
 
-* If a diagonal index specifing `N` axes is applied to fewer than `N` axes, the extra axes are treated as having size 1.  Thus if all the offsets in the extra axes are zero the selected diagonal will have length 1; otherwise the diagonal will have length 0.  
+* If the last `N` axes of an array are indexed by a diagonal specifying more than `N` axes, the extra axes are treated as having size 1.  Thus if all the offsets in the extra axes are zero the selected diagonal will have length 1; otherwise the diagonal will have length 0.  
 
 * Indexing with `diagonal` always yields an array (never a scalar).
 
@@ -85,7 +85,7 @@ As an alternative to `diagonal(0,...,0)`, the equivalent (and in some cases shor
 
 ## Implementation Details
 
-`DiagonalIndexing` exploits the fact that Julia allows any type of value to be used an index, so long as methods are provided to translate that value into a collection of integer indices.  `diagonal` is a function that constructs an instance of `DiagIndex{N}`, which represents a diagonal on `N` axes.  The Base function `to_indices` is extended to translate instances of `DiagIndex` to the appropriate ranges of indices of the targeted array.  In the general case, a `DiagIndex` instance is translated to a vector of `CartesianIndex` values, e.g. 
+`DiagonalIndexing` exploits the fact that Julia allows any type of value to be used an index, so long as methods are provided to translate that value into a collection of integer or Cartesian indices.  `diagonal` is a function that constructs an instance of `DiagIndex{N}`, which represents a diagonal on `N` axes.  The Base function `to_indices` is extended to translate instances of `DiagIndex` to the appropriate ranges of indices of the targeted array.  In the general case, a `DiagIndex` instance is translated to a vector of `CartesianIndex` values, e.g. 
 ```
 [CartesianIndex((1,1,...)), CartesianIndex((2,2,...)), ...]
 ```
