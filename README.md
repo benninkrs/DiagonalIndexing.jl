@@ -10,18 +10,19 @@ This package provides a more convenient and flexible approach to diagonal indexi
 
 ## Installation
 
-`DiagonalIndexing` is an unregistered Julia package.  To install it, from the Julia terminal enter package mode by entering `]`.  Then add the package via the following command:
+To install DiagonalIndexing, enter package mode in Julia by typing `]`, then enter the following command:
 ```
-pkg> add https://github.com/benninkrs/DiagonalIndexing.jl
-``` 
-It can then be used like any other package via `using` or `import/`.
+pkg> add DiagonalIndexing
+```
 
 
 ## Usage
 
 Use the exported constant `diagonal` as the sole index to select the main diagonal of an array:
 ```
-julia>  A = [1 2 3; 4 5 6; 7 8 9; 10 11 12]
+julia> using DiagonalIndexing
+
+julia> A = [1 2 3; 4 5 6; 7 8 9; 10 11 12]
 4×3 Matrix{Int64}:
   1   2   3
   4   5   6
@@ -43,7 +44,7 @@ julia> A[diagonal] = [-1, -5, -9]; A
 ```
 `diagonal` can also be used as the _last_ of multiple indices to select the main diagonal on all remaining axes.
 
-More generally, `diagonal(o1,...,oN)` selects a diagonal on `N` consecutive axes, starting at the element offset by '(o_1,...,o_N)` units from the first element: 
+More generally, `diagonal(o1,...,oN)` selects a diagonal on `N` consecutive axes, starting at the element offset by `(o_1,...,o_N)` units from the first element: 
 ```
 julia> A[diagonal(0,1)]      
 2-element Vector{Int64}:
