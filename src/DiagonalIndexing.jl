@@ -26,16 +26,14 @@ struct DiagCartesianIndices{T} <: AbstractArray{Int64,1}
 end
 
 
-# indexing by a linear index returns a CartesianIndex
-function getindex(ind::DiagCartesianIndices, i::Int)
-	t = getindex.(ind.ax, i)
-	CartesianIndex(t)
-end
-
 # Define additional indexing properties
 IndexStyle(::DiagCartesianIndices) = IndexLinear()
-length(ind::DiagCartesianIndices) = minimum(length.(ind.ax))
+length(ind::DiagCartesianIndices) = minimum(map(length, ind.ax))
 size(ind::DiagCartesianIndices) = (length(ind),)
+
+
+# indexing by a linear index returns a CartesianIndex
+@inbounds getindex(ind::DiagCartesianIndices, i::Int) = CartesianIndex(map(a -> a[i], ind.ax))
 
 
 # By construction, DiagCartesianIndices are always inbounds
@@ -54,8 +52,7 @@ end
 
 
 
-# The main export
-
+# The underlying type
 
 """
 	DiagIndex{N}
@@ -82,6 +79,8 @@ struct DiagIndex{N}
 end
 
 
+
+# The user interface
 
 """
 	diagonal
@@ -172,7 +171,6 @@ diagonal(offsets...) = DiagIndex(offsets...)
 	NA = ndims(A)
 	N < NA && error("DiagIndex has fewer dimensions ($N) than the targeted array does ($NA).")
 
-
 	# Calculate the start, step, and stop of the associated range of linear indices
 	# (This does not seem to significantly add to the run time)
 	sz = size(A)
@@ -205,20 +203,9 @@ diagonal(offsets...) = DiagIndex(offsets...)
 end
 
 
-# We used to specialize for 2-dimensional array; but it doesn't seem to yield any benefit.
-# @inline function _to_indices_linear(A::AbstractMatrix, dind::DiagIndex{N}) where {N}
-# 	N == 2 || error("When used as the only index, diagonal must have the same number dimensions as the targeted array")
-# 	m = size(A,1)
-# 	offset = dind.offsets[1] + dind.offsets[2]*m
-# 	(firstindex(A)+offset:(m+1):lastindex(A),)
-# end
-
-
 
 # General case: DiagIndex is not the only index.
 # These functions take axes as an argument and will be called by Base.to_indices(::AbstractArray, I)
-
-# TODO: Would it be feasible and beneficial to do linear indexing when DiagonalIndexing is not the only index?  
 
 
 # When diagonal is the last index, take the main diagonal on all remaining axes.

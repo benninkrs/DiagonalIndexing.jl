@@ -1,10 +1,20 @@
 # DiagonalIndexing.jl 
 **DiagonalIndexing** provides a convenient, flexible way of selecting array diagonals in indexing expressions.
 
-## Introduction
-Julia's built-in support for diagonal indexing is rather limited.  The `diag` function allows one to extract the diagonal of a matrix, but cannot be used to assign to the diagonal.  The `diagind` function returns the indices of the diagonal elements, which are usually not themselves of interest.  Furthermore, built-in support for diagonal indexing is limited to matrices (2-dimensional arrays).
 
-This package provides a more convenient and flexible approach to diagonal indexing.  In brief, `diagonal` may be used as an index to select the main diagonal of any `AbstractArray` (even with custom axes). More generally, `diagonal(o_1,...,o_N)` may be used in the place of N index slots to select a diagonal offset by `(o_1,...,o_N)` elements on `N` consecutive axes. Such a "diagonal index" may occur anywhere in an index list and in combination with other indices.  Indexing diagonals in this way is nearly as fast as indexing with ranges or explicit lists of indices.
+## Introduction
+Julia's built-in support for diagonal indexing is rather basic:  The `diag` function allows one to extract the diagonal of a matrix, but cannot be used to assign to the diagonal.  The `diagind` function returns the indices of the diagonal elements, but these are often just a means to an end.  And support for diagonal indexing is limited to matrices (2-dimensional arrays).
+
+This package provides a more convenient and flexible approach to diagonal indexing.  In brief, `diagonal` may be used as an index to select the main diagonal of any `AbstractArray` (even with custom axes). More generally, `diagonal(o_1,...,o_N)` may be used in the place of `N` index slots to select a diagonal on `N` consecutive axes starting atoffset by `(o_1,...,o_N)` units on `N` consecutive axes. Such a "diagonal index" may occur anywhere in an index list and in combination with other indices.  Indexing diagonals in this way performs comparably to indexing with ranges or explicit lists of indices.
+
+
+## Installation
+
+`DiagonalIndexing` is an unregistered Julia package.  To install it, from the Julia terminal enter package mode by entering `]`.  Then add the package via the following command:
+```
+pkg> add https://github.com/benninkrs/DiagonalIndexing.jl
+``` 
+It can then be used like any other package via `using` or `import/`.
 
 
 ## Usage
@@ -24,23 +34,23 @@ julia> A[diagonal]
  5
  9
 
- julia> A[diagonal] = [-1, -5, -9]; A
+julia> A[diagonal] = [-1, -5, -9]; A
  4×3 Matrix{Int64}:
  -1   2   3
   4  -5   6
   7   8  -9
  10  11  12
 ```
-`diagonal` can also be used as the _last_ of multiple indices to select the main diagonal on the remaining axes.
+`diagonal` can also be used as the _last_ of multiple indices to select the main diagonal on all remaining axes.
 
-More generally, `diagonal(o1,...,oN)` selects a diagonal on `N` consecutive axes, starting with element `[begin+o1, ..., begin+oN]`:
+More generally, `diagonal(o1,...,oN)` selects a diagonal on `N` consecutive axes, starting at the element offset by '(o_1,...,o_N)` units from the first element: 
 ```
 julia> A[diagonal(0,1)]      
 2-element Vector{Int64}:
  2
  6
 ```
- `diagonal(0,...,0)` represents the main diagonal.  Because the number of axes involved is explicit, `diagonal(...)` can be used at any position in an index list:
+ `diagonal(0,...,0)` represents the main diagonal.  Because it specifies the number of axes indexed, `diagonal(o_1,...,o_N)` can be used at any position in an index expression, taking the place of `N` indices:
 ```
 juila> B = [i+10j+100k for i=1:4, j=1:3, k=1:3]
 4×3×3 Array{Int64, 3}:
@@ -64,6 +74,12 @@ juila> B[diagonal(0,0),3]
  322
  333
 
+julia> B[4,:,:]
+3×3 Matrix{Int64}:
+ 114  214  314
+ 124  224  324
+ 134  234  334
+
 juila> B[4,diagonal(1,0)]   
 2-element Vector{Int64}:
  124
@@ -72,7 +88,7 @@ juila> B[4,diagonal(1,0)]
 
 ## Usage Details
 
-When used as an index, `diagonal(o1,o2,...)` is effectively mapped to `[CartesianIndex(begin[1]+o1, begin[2]+o2,...), ..., CartesianIndex(begin[1]+o1+k, begin[2]+o2+k, ...)]` where `first[j]` denotes the first index of the `j`th axis and `k` is the largest value such that the all the indices are in the range of their corresponding axes.  From this definition it follows that:
+When used as an index, `diagonal(o1,o2,...)` is effectively mapped to `[CartesianIndex(a1+o1, a2+o2,...), ..., CartesianIndex(a1+o1+k, a2+o2+k, ...)]` where `aj` denotes the first index of the `j`th targeted axis and `k` is the largest value such that the all the indices are in the range of their corresponding axes.  From this definition it follows that:
 
 * The "diagonal" of a vector (1-dimensional array) is the vector itself.
 
